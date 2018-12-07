@@ -8,9 +8,9 @@ An Ewasm contract is a WebAssembly module with the following restrictions. The m
 
 Below are four quirks of using C/C++ to write Ewasm contracts. These quirks may improve as tools and Ewasm improve.
 
-Quirk 1) WebAssembly is still primitive and lacks features. For example WebAssembly lacks support for exceptions and we have no way to do systeam calls in Ewasm. We compile against patched versions of libc and libc++ to allow us to use `malloc`, but the patches are not enough for `std::vector` which uses more than just `malloc` to manage memory. But memory management may be unwanted for Ewasm contracts since it costs gas. This situation will improve as WebAssembly, compilers, and libraries mature.
+Quirk 1) WebAssembly is still primitive and lacks features. For example WebAssembly lacks support for exceptions and we have no way to do system calls in Ewasm. We compile against patched versions of libc and libc++ to allow us to use `malloc`, but the patches are not enough for `std::vector` which uses more than just `malloc` to manage memory. But memory management may be unwanted for Ewasm contracts since it costs gas. This situation will improve as WebAssembly, compilers, and libraries mature.
 
-Quirk 2) In the current Ewasm design, all communication between the contract and the client is done through the module's memory. For example, the message data ("call data") to the contract is accessed by calling `callDataCopy` to put this data to a location in WebAssembly memory. Accessing a contract's storage requires calls to `storageStore` or `storageLoad`, which take as arguments the memory pointers to the storage address and storage value. We must allocate this memory in C/C++ using `malloc`. For example, before calling `callDataCopy`, one may use `getCallDataSize` to see how many bytes of memory to `malloc`.
+Quirk 2) In the current Ewasm design, all communication between the contract and the client is done through the module's memory. For example, the message data ("call data") to the contract is accessed by calling `callDataCopy`, which puts this data to WebAssembly memory at a location given by a pointer. We must allocate this memory in C/C++ using `malloc`. For example, before calling `callDataCopy`, one may use `getCallDataSize` to see how many bytes of memory to `malloc`.
 
 Quirk 3) In the current Ewasm design, the Ethereum client writes data into WebAssembly as big-endian, and WebAssembly memory is little-endian, so has reversed bytes when the data is in the WebAssembly operand stack. For example, when the call data is brought into memory using `callDataCopy`, and those bytes are loaded to the WebAssembly stack using `i64.load`, all of the bytes are reversed. So extra C/C+ code may be needed to reverse the bytes.
 
@@ -24,7 +24,7 @@ The wasmception package offers patches to libc and libc++ which allow using `mal
 ```sh 
 git clone https://github.com/yurydelendik/wasmception.git
 cd wasmception
-make -j4	# Warning: this required lots of internet bandwidth, RAM, and one hour on a mid-level laptop.
+make -j4	# Warning: this required lots of internet bandwidth, RAM, and one hour compiling on a mid-level laptop.
 cd ..
 ``` 
 
@@ -41,9 +41,9 @@ cd cwrc20
 make
 ```
 
-The output is `main.wasm` whith needs a cleanup of imports and exports to meet Ewasm requirements. For this, we use PyWebAssembly. 
+The output is `main.wasm` which needs a cleanup of imports and exports to meet Ewasm requirements. For this, we use PyWebAssembly. 
 
-Aside: Alternatively, one can manually cleanup. Alternatively, one can use a [rust version of wasm-chisel](https://github.com/wasmx/wasm-chisel) which can be installed with `cargo install chisel`. The Rust version has more features, the Python version is just enough for our use. In either case, before deploying, contracts should be visually inspected to make sure that imports and exports meet Ewasm requirements.
+Aside: Alternatively, one can manually cleanup. Alternatively, one can use a [rust version of wasm-chisel](https://github.com/wasmx/wasm-chisel) which can be installed with `cargo install chisel`. The Rust version is stricter and has more features, the Python version is just enough for our use. In either case, before deploying, contracts should be visually inspected to make sure that imports and exports meet Ewasm requirements.
 
 ```
 cd ..
@@ -53,7 +53,7 @@ python3 ewasm_chisel.py ../../cwrc20/main.wasm
 cd ../../cwrc20
 ```
 
-The output `main_chiseled.wasm` is an Ewasm contract. To deploy it from http://ewasm.ethereum.org/studio/, we need to convert it form the `.wasm` binary format to the `.wat` (or `.wast`) text format. This conversion can be done with Binaryen's `wasm-dis`.
+The output `main_chiseled.wasm` is an Ewasm contract. To deploy it from http://ewasm.ethereum.org/studio/, we need to convert it from the `.wasm` binary format to the `.wat` (or `.wast`) text format. This conversion can be done with Binaryen's `wasm-dis`.
 
 Aside: Alternatively one can use Wabt's `wasm2wat`. But Binaryen's `wasm-dis` is recommended because Ewasm studio uses Binaryen internally, and Binaryen can be quirky and fail to read the `.wat` generated elsewhere. Also, if Binaryen's `wasm-dis` can't read the `.wasm`, try using Wabt's `wasm2wat` then `wat2wasm` before trying again with Binaryen.
 
