@@ -89,7 +89,6 @@ One of the [design goals](https://github.com/ewasm/design/blob/master/rationale.
 
 At present, we've developed support for the following languages and toolchains:
 
-- [C/C++ (LLVM) WebAssembly tutorial](./clang.md)
 - [C/C++](./c_cpp_guide.md)
 - Rust: documentation pending
 - [AssemblyScript](https://github.com/AssemblyScript/assemblyscript), a subset of TypeScript, which uses the JavaScript toolchain: see the [etherts org](https://github.com/etherts/docs) for more information on writing contracts in AssemblyScript.
