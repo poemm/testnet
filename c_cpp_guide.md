@@ -41,7 +41,7 @@ cd cwrc20
 make
 ```
 
-The output is `main.wasm` which needs a cleanup of imports and exports to meet Ewasm requirements. For this, we use PyWebAssembly. 
+The output is `main.wasm` which needs a cleanup of imports and exports to meet Ewasm requirements. For this, we use PyWebAssembly.
 
 Aside: Alternatively, one can manually cleanup. Alternatively, one can use a [rust version of wasm-chisel](https://github.com/wasmx/wasm-chisel) which can be installed with `cargo install chisel`. The Rust version is stricter and has more features, the Python version is just enough for our use. In either case, before deploying, contracts should be visually inspected to make sure that imports and exports meet Ewasm requirements.
 
@@ -53,7 +53,9 @@ python3 ewasm_chisel.py ../../cwrc20/main.wasm
 cd ../../cwrc20
 ```
 
-The output `main_chiseled.wasm` is an Ewasm contract. To deploy it from http://ewasm.ethereum.org/studio/, we need to convert it from the `.wasm` binary format to the `.wat` (or `.wast`) text format. This conversion can be done with Binaryen's `wasm-dis`.
+If the command line output of the `main_chiseled.wasm` command above lists only valid Ewasm imports and exports, then we may have an valid Ewasm contract! Otherwise, we need a trick to eliminate them, similar to how we used a patched musl libc so that we can use malloc without extra imports or exports.
+
+To deploy the Ewasm contract from http://ewasm.ethereum.org/studio/, we need to convert it from the `.wasm` binary format to the `.wat` (or `.wast`) text format (these are equivalent formats and can be converted back-and-forth). This conversion can be done with Binaryen's `wasm-dis`.
 
 Aside: Alternatively one can use Wabt's `wasm2wat`. But Binaryen's `wasm-dis` is recommended because Ewasm studio uses Binaryen internally, and Binaryen can be quirky and fail to read the `.wat` generated elsewhere. Also, if Binaryen's `wasm-dis` can't read the `.wasm`, try using Wabt's `wasm2wat` then `wat2wasm` before trying again with Binaryen.
 
@@ -69,3 +71,8 @@ cd ../../cwrc20
 ```
 
 Now `main_chiseled.wat` can be pasted into http://ewasm.ethereum.org/studio/ and deployed. Happy hacking!
+
+
+## Advanced
+
+The above guide is for compiling a single C file with no system calls (we enabled `malloc` by patching it). This may be enough for basic examples. The user is encouraged to explore ways to do advanced things. For example, an interesting idea is to statically link against other C files using LLVM IR as described here https://aransentin.github.io/cwasm/ .
