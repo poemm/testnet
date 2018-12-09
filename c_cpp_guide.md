@@ -43,17 +43,17 @@ make
 
 The output is `main.wasm` which needs a cleanup of imports and exports to meet Ewasm requirements. For this, we use PyWebAssembly.
 
-Aside: Alternatively, one can manually cleanup. Alternatively, one can use a [rust version of wasm-chisel](https://github.com/wasmx/wasm-chisel) which can be installed with `cargo install chisel`. The Rust version is stricter and has more features, the Python version is just enough for our use. In either case, before deploying, contracts should be visually inspected to make sure that imports and exports meet Ewasm requirements.
+Aside: Alternatively, one can manually cleanup. Alternatively, one can use [wasm-chisel](https://github.com/wasmx/wasm-chisel) which is a program in Rust which can be installed with `cargo install chisel`. The Rust version is stricter and has more features, the Python version is just enough for our use. In either case, before deploying, contracts should be visually inspected to make sure that imports and exports meet Ewasm requirements.
 
 ```
 cd ..
 git clone https://github.com/poemm/pywebassembly.git
 cd pywebassembly/examples/
-python3 ewasm_chisel.py ../../cwrc20/main.wasm
+python3 ewasmify.py ../../cwrc20/main.wasm
 cd ../../cwrc20
 ```
 
-If the command line output of the `main_chiseled.wasm` command above lists only valid Ewasm imports and exports, then we may have an valid Ewasm contract! Otherwise, we need a trick to eliminate them, similar to how we used a patched musl libc so that we can use malloc without extra imports or exports.
+If the command line output of the `main_ewasmified.wasm` command above lists only valid Ewasm imports and exports, then we may have an valid Ewasm contract! Otherwise, we need a trick to eliminate them, similar to how we used a patched musl libc so that we can use malloc without extra imports or exports.
 
 To deploy the Ewasm contract from http://ewasm.ethereum.org/studio/, we need to convert it from the `.wasm` binary format to the `.wat` (or `.wast`) text format (these are equivalent formats and can be converted back-and-forth). This conversion can be done with Binaryen's `wasm-dis`.
 
@@ -67,10 +67,10 @@ mkdir build && cd build
 cmake ..
 make -j4
 cd ../../cwrc20
-../binaryen/build/bin/wasm-dis main_chiseled.wasm > main_chiseled.wat
+../binaryen/build/bin/wasm-dis main_ewasmified.wasm > main_ewasmified.wat
 ```
 
-Now `main_chiseled.wat` can be pasted into http://ewasm.ethereum.org/studio/ and deployed. Happy hacking!
+Now `main_ewasmified.wat` can be pasted into http://ewasm.ethereum.org/studio/ and deployed. Happy hacking!
 
 
 ## Advanced
