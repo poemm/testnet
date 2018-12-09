@@ -53,7 +53,7 @@ python3 ewasmify.py ../../cwrc20/main.wasm
 cd ../../cwrc20
 ```
 
-If the command line output of the `main_ewasmified.wasm` command above lists only valid Ewasm imports and exports, then we may have an valid Ewasm contract! Otherwise, we need a trick to eliminate them, similar to how we used a patched musl libc so that we can use malloc without extra imports or exports.
+Check whether the command line output of `ewasmify.py` above lists only valid Ewasm imports and exports. If not, then we need a trick to eliminate non-Ewasm imports or exports, similar to how we used a patched musl libc so that we can use malloc without extra imports or exports.
 
 To deploy the Ewasm contract from http://ewasm.ethereum.org/studio/, we need to convert it from the `.wasm` binary format to the `.wat` (or `.wast`) text format (these are equivalent formats and can be converted back-and-forth). This conversion can be done with Binaryen's `wasm-dis`.
 
