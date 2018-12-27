@@ -4,19 +4,23 @@ First an introduction, then a basic step-by-step guide, then advanced things. Wa
 
 ## Introduction
 
-An Ewasm contract is a WebAssembly module with the following restrictions. The module's imports must be among the [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) which resemble EVM opcodes to interact with the client. The module's exports must be a `main` function which takes no arguments and returns nothing, and the `memory` of the module. The module may not use floats or other [sources of non-determinism](https://github.com/WebAssembly/design/blob/master/Nondeterminism.md).
+An Ewasm contract is a WebAssembly module with the following restrictions:
 
-Below are quirks to be aware of when writing Ewasm contracts in C/C++. These quirks are not limited to C/C++. Things may improve as tools and Ewasm improve.
+- The module's imports must be among the [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) which resemble EVM opcodes to interact with the client.
+- The module's exports must be a `main` function which takes no arguments and returns nothing, and the `memory` of the module.
+- The module may not use floats or other [sources of non-determinism](https://github.com/WebAssembly/design/blob/master/Nondeterminism.md).
 
-Quirk 1) WebAssembly is still primitive and lacks features. For example, WebAssembly lacks support for exceptions and we have no way to do system calls in Ewasm. Compilers and libraries are still primitive. For example, we have patched version of libc to allow `malloc`, but the patches are not yet enough for `std::vector` because other memory managment calls are unavailable. But perhaps any memory management beyond memory allocation may be unwanted for Ewasm contracts since it costs gas. This situation will improve as WebAssembly, compilers, and libraries mature.
+When writing Ewasm contracts in C/C++, one should bear in mind the following caveats:
 
-Quirk 2) In the current Ewasm design, all communication between the contract and the client is done through the module's memory. For example, the message data ("call data") sent to the contract is accessed by calling `callDataCopy()`, which puts this data to WebAssembly memory at a location given by a pointer. This pointer must be to either to a statically allocated array, or to dynamically allocated memory using `malloc`. For example, before calling `callDataCopy()`, one may use `getCallDataSize()` to see how many bytes of memory to `malloc`.
+1. WebAssembly is still primitive and lacks features. For example, WebAssembly lacks support for exceptions and we have no way to do system calls in Ewasm. Compilers and libraries are still primitive. For example, we have a patched version of libc to allow `malloc`, but the patches are not yet enough for `std::vector` because other memory managment calls are unavailable. But perhaps any memory management beyond memory allocation may be unwanted for Ewasm contracts since it costs gas. This situation will improve as WebAssembly, compilers, and libraries mature.
 
-Quirk 3) In the current Ewasm design, the Ethereum client writes data into WebAssembly as big-endian, but WebAssembly memory is little-endian, so has reversed bytes when the data is brought to/from the WebAssembly operand stack. For example, when the call data is brought into memory using `callDataCopy`, and those bytes are loaded to the WebAssembly stack using `i64.load`, all of the bytes are reversed. So extra C/C++ code may be needed to load bytes from the correct location and to reverse the loaded bytes.
+1. In the current Ewasm design, all communication between the contract and the client is done through the module's memory. For example, the message data ("call data") sent to the contract is accessed by calling `callDataCopy()`, which puts this data to WebAssembly memory at a location given by a pointer. This pointer must be to either to a statically allocated array, or to dynamically allocated memory using `malloc`. For example, before calling `callDataCopy()`, one may use `getCallDataSize()` to see how many bytes of memory to `malloc`.
 
-Quirk 4) The output of compilers is a `.wasm` binary which may have imports and exports which do not meet Ewasm requirements. We have tools to fix the imports and exports.
+1. In the current Ewasm design, the Ethereum client writes data into WebAssembly as big-endian, but WebAssembly memory is little-endian, so has reversed bytes when the data is brought to/from the WebAssembly operand stack. For example, when the call data is brought into memory using `callDataCopy`, and those bytes are loaded to the WebAssembly stack using `i64.load`, all of the bytes are reversed. So extra C/C++ code may be needed to load bytes from the correct location and to reverse the loaded bytes.
 
-Quirk 5) There are no tutorials for debugging/testing a contract. Hera supports extra Ewasm helper functions to print things, which have helped in writing test cases. A tutorial is needed to allow early adopters to debug/test their contracts without having to do it on the testnet.
+1. The output of compilers is a `.wasm` binary which may have imports and exports which do not meet Ewasm requirements. We have tools to fix the imports and exports.
+
+1. There are no tutorials for debugging/testing a contract. Hera supports extra Ewasm helper functions to print things, which have helped in writing test cases. A tutorial is needed to allow early adopters to debug/test their contracts without having to do it on the testnet.
 
 ## Basic Step-by-Step Guide
 
