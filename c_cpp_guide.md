@@ -4,7 +4,7 @@ First an introduction, then a basic step-by-step guide, then advanced things. Wa
 
 ## Introduction
 
-An Ewasm contract is a WebAssembly module with the following restrictions. The module's imports must be among the [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) which resemble EVM opcodes to interact with the client. The module's exports must be a `main` function which takes no arguments and returns nothing, and the `memory` of the module. The module may not use floats or other sources of non-determinism.
+An Ewasm contract is a WebAssembly module with the following restrictions. The module's imports must be among the [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) which resemble EVM opcodes to interact with the client. The module's exports must be a `main` function which takes no arguments and returns nothing, and the `memory` of the module. The module may not use floats or other [sources of non-determinism](https://github.com/WebAssembly/design/blob/master/Nondeterminism.md).
 
 Below are quirks to be aware of when writing Ewasm contracts in C/C++. These quirks are not limited to C/C++. Things may improve as tools and Ewasm improve.
 
