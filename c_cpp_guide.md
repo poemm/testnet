@@ -10,6 +10,8 @@ An Ewasm contract is a WebAssembly module with the following restrictions:
 - The module's exports must be a `main` function which takes no arguments and returns nothing, and the `memory` of the module.
 - The module may not use floats or other [sources of non-determinism](https://github.com/WebAssembly/design/blob/master/Nondeterminism.md).
 
+## Caveats
+
 When writing Ewasm contracts in C/C++, one should bear in mind the following caveats:
 
 1. WebAssembly is still primitive and [lacks features](https://github.com/WebAssembly/design/blob/master/FutureFeatures.md). For example, WebAssembly lacks support for exceptions and we have no way to do system calls in Ewasm. Compilers and libraries are still primitive. For example, we have a patched version of libc to allow `malloc`, but the patches are not yet enough for `std::vector` because other memory managment calls are unavailable. But perhaps any memory management beyond memory allocation may be unwanted for Ewasm contracts since it costs gas. This situation will improve as WebAssembly, compilers, and libraries mature.
