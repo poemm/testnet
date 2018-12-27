@@ -26,9 +26,7 @@ When writing Ewasm contracts in C/C++, one should bear in mind the following cav
 
 ## Basic Step-by-Step Guide
 
-First build the latest version of LLVM.
-
-Aside: If you wish to use C/C++ standard libraries, then build the version of LLVM in the Advanced section below. That version can also be used here.
+First let's build the latest version of LLVM. Note: this section of the document allows you to build LLVM without any standard libraries. If you wish to use C/C++ standard libraries, then build the version of LLVM in the Advanced section below. That version can also be used here.
 
 ```sh 
 # checkout LLVM, clang, and lld
@@ -43,23 +41,28 @@ mkdir llvm-build
 cd llvm-build
 # note: if you want other targets than WebAssembly, then delete -DLLVM_TARGETS_TO_BUILD=
 cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD= -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=WebAssembly ../llvm                 
-make -j 8       # WARNING, THIS CAN TAKE HOURS, NEEDS LOTS OF DISK AND RAM, AND MAY CAUSE YOUR COMPUTER TO FREEZE. IF IT ERRORS, TRY AGAIN WITHOUT -j 8
+make -j 8
 ``` 
 
-Next download and compile a wrc20 ewasm contract written in C. Note that in `main.c`, there are many arrays in global scope -- LLVM puts global arrays in WebAssembly memory, which is allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has a path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
+Warning: this `cmake` step can take hours, requires a lot of disk space and memory, and may cause your computer to freeze. If there is an error, try again without the `-j 8` argument (which attempts to run eight parallel build processes).
+
+Next download and compile a wrc20 ewasm contract written in C:
+
+```sh
+git clone https://gist.github.com/poemm/68a7b70ec353abaeae64bf6fe95d2d52.git cwrc20
+```
+
+Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has a path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
 
 Aside: If you are using C++, make sure to modify the Makefile to `clang++`, use `extern "C"` around the helper function declarations.
 
 ```sh
-git clone https://gist.github.com/poemm/68a7b70ec353abaeae64bf6fe95d2d52.git cwrc20
 cd cwrc20
 # edit the Makefile and main.syms as described above
 make
 ```
 
-The output is `main.wasm` which needs a cleanup of imports and exports to meet Ewasm requirements. For this, we use PyWebAssembly.
-
-Aside: Alternatively, one can manually cleanup. Alternatively, one can use [wasm-chisel](https://github.com/wasmx/wasm-chisel), a program in Rust which can be installed with `cargo install chisel`. The Rust version is stricter and has more features, the Python version is just enough for our use-case, and Python is available on most machines.
+The output is `main.wasm` which needs a cleanup of imports and exports to meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). For this, we use [PyWebAssembly](https://github.com/poemm/pywebassembly), perform the cleanup manually, or use [wasm-chisel](https://github.com/wasmx/wasm-chisel), a program in Rust which can be installed with `cargo install chisel`. `wasm-chisel` is stricter and has more features, whereas `PyWebAssembly` is just enough for our use case, and Python is available on most machines. We therefore recommend using PyWebAssembly as follows:
 
 ```
 cd ..
@@ -69,7 +72,7 @@ python3 ewasmify.py ../../cwrc20/main.wasm
 cd ../../cwrc20
 ```
 
-Check whether the command line output of `ewasmify.py` above lists only valid Ewasm imports and exports. To troubleshoot, you may wish to also inspect `main.wasm` in its text representation, so proceed to the next step with binaryen or wabt.
+Check whether the command line output of `ewasmify.py` above lists only [valid Ewasm imports and exports](https://github.com/ewasm/design/blob/master/eth_interface.md). To troubleshoot, you may wish to also inspect `main.wasm` in its text representation, so proceed to the next step with binaryen or wabt.
 
 We can convert from the `.wasm` binary format to the `.wat` (or `.wast`) text format (these are equivalent formats and can be converted back-and-forth). This conversion can be done with Binaryen's `wasm-dis`.
 
