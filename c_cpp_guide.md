@@ -11,23 +11,23 @@ When writing Ewasm contracts in C/C++, one should bear in mind the following cav
 
 1. WebAssembly is still primitive and [lacks features](https://github.com/WebAssembly/design/blob/master/FutureFeatures.md). For example, WebAssembly lacks support for exceptions. Also, compilers and standard libraries support is still primitive, often existing as experimental features or third party patches.
 
-1. Ewasm does not support operating system calls, for example `printf()` and `clock()` are unsupported. This is especially relevant for contracts which require memory management -- we patch libc with a WebAssembly-compatible version of `malloc` which we compile into the module. But the patches are not yet enough for `std::vector` because it requries other memory managment calls which are not yet patched.
+1. Ewasm does not support operating system calls, for example `printf()` and `clock()` are unsupported. This is especially relevant for contracts which require memory management -- we patch libc with a WebAssembly-compatible version of `malloc` which we compile into the module. But the patches are not yet enough for `std::vector` because it requires other memory management calls which are not yet patched.
 
 1. [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) communicate with the contract by reading/writing to/from the WebAssembly module's memory at locations provided by a C/C++ pointer. For example, this C/C++ pointer can point to a statically allocated array in global scope (since our LLVM compiler maps C/C++ global arrays to WebAssembly memory), or to dynamically allocated memory using `malloc`. To conserve gas, it may be wise to avoid `malloc` whenever possible.
 
 1. Ethereum clients read/write data into WebAssembly memory as big-endian, but WebAssembly memory is little-endian, so bytes are reversed when brought to/from the WebAssembly operand stack. For example, when the call data is brought into memory using Ewasm helper function `callDataCopy`, and those bytes are loaded to the WebAssembly stack using `i64.load`, all of the bytes are reversed. So extra C/C++ code may be needed to to reverse the loaded bytes.
 
-1. The output of compilers is a `.wasm` binary which may not meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). In the examples below, we use tools which automatically apply changes to meet these requirmentes. When writing more complicated contracts, manual inspection and troubleshooting may be required.
+1. The output of compilers is a `.wasm` binary which may not meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). In the examples below, we use tools which automatically apply changes to meet these requirements. When writing more complicated contracts, manual inspection and troubleshooting may be required.
 
 1. Tools are needed for developers to debug/test their Ewasm contracts. Early adopters may debug/test on the testnet by printing things to storage.
 
 ## Basic Step-by-Step Guide
 
-First build the latest version of LLVM, clang, and lld. Below we devaite from the [official instructions](https://clang.llvm.org/get_started.html) by using git and adding some flags to `cmake`.
+First build the latest version of LLVM, clang, and lld. Below we deviate from the [official instructions](https://clang.llvm.org/get_started.html) by using git and adding some flags to `cmake`.
 
 Aside: If you wish to use C/C++ standard libraries, then build the version of LLVM in the Advanced section below. That version can also be used here.
 
-Aside: The following dowloads hundreds of megabytes. The `make` step can take hours, require a lot of disk space and memory, and may even cause your computer to freeze. If there is an out-of-memory error, try again without the `-j 8` argument (which attempts to run eight parallel build processes).
+Aside: The following downloads hundreds of megabytes. The `make` step can take hours, require a lot of disk space and memory, and may even cause your computer to freeze. If there is an out-of-memory error, try again without the `-j 8` argument (which attempts to run eight parallel build processes).
 
 ```sh 
 # checkout LLVM, clang, and lld
