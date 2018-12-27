@@ -1,68 +1,62 @@
 # Compiling C/C++ to Ewasm
 
-First an introduction, then a basic step-by-step guide, then advanced things. Warning: the Ewasm spec and tools below are subject to change.
 
 ## Introduction
 
-An Ewasm contract is a WebAssembly module with the following restrictions:
-
-- The module's imports must be among the [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) which resemble EVM opcodes to interact with the client.
-- The module's exports must be a `main` function which takes no arguments and returns nothing, and the `memory` of the module.
-- The module may not use floats or other [sources of non-determinism](https://github.com/WebAssembly/design/blob/master/Nondeterminism.md).
+The goal of this document is to provide a guide to compile C/C++ to Ewasm. This document assumes knowledge of the [Ewasm design repo](https://github.com/ewasm/design). Especially relevant is that an Ewasm contract is a WebAssembly module with [restrictions](https://github.com/ewasm/design/blob/master/contract_interface.md), and that an Ewasm contract can call [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md), which resemble EVM opcodes.
 
 ## Caveats
 
-When writing Ewasm contracts in C/C++, one should bear in mind the following caveats:
+When writing Ewasm contracts in C/C++, one should bear in mind the following caveats.
 
-1. WebAssembly is still primitive and [lacks features](https://github.com/WebAssembly/design/blob/master/FutureFeatures.md). For example, WebAssembly lacks support for exceptions and we have no way to do system calls in Ewasm. Compilers and libraries are still primitive. For example, we have a patched version of libc to allow `malloc`, but the patches are not yet enough for `std::vector` because other memory managment calls are unavailable. But perhaps any memory management beyond memory allocation may be unwanted for Ewasm contracts since it costs gas. This situation will improve as WebAssembly, compilers, and libraries mature.
+1. WebAssembly is still primitive and [lacks features](https://github.com/WebAssembly/design/blob/master/FutureFeatures.md). For example, WebAssembly lacks support for exceptions. Also, compilers and standard libraries support is still primitive, often existing as experimental features or third party patches.
 
-1. In the current Ewasm design, all communication between the contract and the client is done through the module's memory. For example, the message data ("call data") sent to the contract is accessed by calling `callDataCopy()`, which puts this data to WebAssembly memory at a location given by a pointer. This pointer must be to either to a statically allocated array, or to dynamically allocated memory using `malloc`. For example, before calling `callDataCopy()`, one may use `getCallDataSize()` to see how many bytes of memory to `malloc`.
+1. Ewasm does not support operating system calls, for example `printf()` and `clock()` are unsupported. This is especially relevant for contracts which require memory management -- we patch libc with a WebAssembly-compatible version of `malloc` which we compile into the module. But the patches are not yet enough for `std::vector` because it requries other memory managment calls which are not yet patched.
 
-1. In the current Ewasm design, the Ethereum client writes data into WebAssembly as big-endian, but WebAssembly memory is little-endian, so has reversed bytes when the data is brought to/from the WebAssembly operand stack. For example, when the call data is brought into memory using `callDataCopy`, and those bytes are loaded to the WebAssembly stack using `i64.load`, all of the bytes are reversed. So extra C/C++ code may be needed to load bytes from the correct location and to reverse the loaded bytes.
+1. [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md) communicate with the contract by reading/writing to/from the WebAssembly module's memory at locations provided by a C/C++ pointer. For example, this C/C++ pointer can point to a statically allocated array in global scope (since our LLVM compiler maps C/C++ global arrays to WebAssembly memory), or to dynamically allocated memory using `malloc`. To conserve gas, it may be wise to avoid `malloc` whenever possible.
 
-1. The output of compilers is a `.wasm` binary which may have imports and exports which do not meet Ewasm requirements. We have tools to fix the imports and exports.
+1. Ethereum clients read/write data into WebAssembly memory as big-endian, but WebAssembly memory is little-endian, so bytes are reversed when brought to/from the WebAssembly operand stack. For example, when the call data is brought into memory using Ewasm helper function `callDataCopy`, and those bytes are loaded to the WebAssembly stack using `i64.load`, all of the bytes are reversed. So extra C/C++ code may be needed to to reverse the loaded bytes.
 
-1. There are no tutorials for debugging/testing a contract. Hera supports extra Ewasm helper functions to print things, which have helped in writing test cases. A tutorial is needed to allow early adopters to debug/test their contracts without having to do it on the testnet.
+1. The output of compilers is a `.wasm` binary which may not meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). In the examples below, we use tools which automatically apply changes to meet these requirmentes. When writing more complicated contracts, manual inspection and troubleshooting may be required.
+
+1. Tools are needed for developers to debug/test their Ewasm contracts. Early adopters may debug/test on the testnet by printing things to storage.
 
 ## Basic Step-by-Step Guide
 
-First let's build the latest version of LLVM. Note: this section of the document allows you to build LLVM without any standard libraries. If you wish to use C/C++ standard libraries, then build the version of LLVM in the Advanced section below. That version can also be used here.
+First build the latest version of LLVM, clang, and lld. Below we devaite from the [official instructions](https://clang.llvm.org/get_started.html) by using git and adding some flags to `cmake`.
+
+Aside: If you wish to use C/C++ standard libraries, then build the version of LLVM in the Advanced section below. That version can also be used here.
+
+Aside: The following dowloads hundreds of megabytes. The `make` step can take hours, require a lot of disk space and memory, and may even cause your computer to freeze. If there is an out-of-memory error, try again without the `-j 8` argument (which attempts to run eight parallel build processes).
 
 ```sh 
 # checkout LLVM, clang, and lld
-svn co http://llvm.org/svn/llvm-project/llvm/trunk llvm
+git clone http://llvm.org/git/llvm.git
 cd llvm/tools
-svn co http://llvm.org/svn/llvm-project/cfe/trunk clang
-svn co http://llvm.org/svn/llvm-project/lld/trunk lld
+git clone http://llvm.org/git/clang.git
+git clone http://llvm.org/git/lld.git
 cd ../..
 
 # build LLVM, clang, and lld
 mkdir llvm-build
 cd llvm-build
-# note: if you want other targets than WebAssembly, then delete -DLLVM_TARGETS_TO_BUILD=
 cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD= -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=WebAssembly ../llvm                 
 make -j 8
 ``` 
 
-Warning: this `cmake` step can take hours, requires a lot of disk space and memory, and may cause your computer to freeze. If there is an error, try again without the `-j 8` argument (which attempts to run eight parallel build processes).
 
-Next download and compile a wrc20 ewasm contract written in C:
-
-```sh
-git clone https://gist.github.com/poemm/68a7b70ec353abaeae64bf6fe95d2d52.git cwrc20
-```
-
-Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has a path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
+Next download and compile an example ewasm contract written in C. Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has a path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
 
 Aside: If you are using C++, make sure to modify the Makefile to `clang++`, use `extern "C"` around the helper function declarations.
 
 ```sh
+git clone https://gist.github.com/poemm/68a7b70ec353abaeae64bf6fe95d2d52.git cwrc20
 cd cwrc20
 # edit the Makefile and main.syms as described above
 make
 ```
 
-The output is `main.wasm` which needs a cleanup of imports and exports to meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). For this, we use [PyWebAssembly](https://github.com/poemm/pywebassembly), perform the cleanup manually, or use [wasm-chisel](https://github.com/wasmx/wasm-chisel), a program in Rust which can be installed with `cargo install chisel`. `wasm-chisel` is stricter and has more features, whereas `PyWebAssembly` is just enough for our use case, and Python is available on most machines. We therefore recommend using PyWebAssembly as follows:
+The output is `main.wasm` which needs a cleanup of imports and exports to meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). For this, we can use [PyWebAssembly](https://github.com/poemm/pywebassembly), perform the cleanup manually, or use [wasm-chisel](https://github.com/wasmx/wasm-chisel), a program in Rust which can be installed with `cargo install chisel`. `wasm-chisel` is stricter and has more features, whereas `PyWebAssembly` is just enough for our use case, and Python is available on most machines. We therefore recommend using PyWebAssembly as follows.
 
 ```
 cd ..
@@ -72,9 +66,7 @@ python3 ewasmify.py ../../cwrc20/main.wasm
 cd ../../cwrc20
 ```
 
-Check whether the command line output of `ewasmify.py` above lists only [valid Ewasm imports and exports](https://github.com/ewasm/design/blob/master/eth_interface.md). To troubleshoot, you may wish to also inspect `main.wasm` in its text representation, so proceed to the next step with binaryen or wabt.
-
-We can convert from the `.wasm` binary format to the `.wat` (or `.wast`) text format (these are equivalent formats and can be converted back-and-forth). This conversion can be done with Binaryen's `wasm-dis`.
+The output `main_ewasmified.wasm` should be a valid Ewasm contract. But it should be inspected to make sure that the imports and exports meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). We do this inspection by first converting from the `.wasm` binary format to the `.wat` text format (these are equivalent formats and can be converted back-and-forth). This conversion can be done with Binaryen's `wasm-dis`.
 
 Aside: Alternatively one can use Wabt's `wasm2wat`. But Binaryen's `wasm-dis` is recommended because Ewasm studio uses Binaryen internally, and Binaryen can be quirky and fail to read a `.wat` generated by another program. Another tip: if Binaryen's `wasm-dis` can't read the `.wasm`, try using Wabt's `wasm2wat` then `wat2wasm` before trying again with Binaryen.
 
@@ -89,7 +81,7 @@ cd ../../cwrc20
 ../binaryen/build/bin/wasm-dis main_ewasmified.wasm > main_ewasmified.wat
 ```
 
-`main_ewasmified.wat` is an ewasm contract. See other notes for how to deploy it. Happy hacking!
+`main_ewasmified.wat` is an ewasm contract in text format. See other notes for how to deploy it. Happy hacking!
 
 
 ## Advanced
