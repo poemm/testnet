@@ -45,14 +45,13 @@ make -j 8
 ``` 
 
 
-Next download and compile an example ewasm contract written in C. Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has a path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
+Next download and compile an example ewasm contract written in C. Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has the correct path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
 
-Aside: If you are using C++, make sure to modify the Makefile to `clang++`, use `extern "C"` around the helper function declarations.
+Aside: A similar C++ example is found here https://gist.github.com/poemm/5dda50f354e06371fd0e7cef2271c6b0.git .
 
 ```sh
 git clone https://gist.github.com/poemm/68a7b70ec353abaeae64bf6fe95d2d52.git cwrc20
 cd cwrc20
-# edit the Makefile and main.syms as described above
 make
 ```
 
@@ -97,8 +96,6 @@ cd ..
 Write down the end of the output of the above `make` command, it should include something like: `--sysroot=/home/user/repos/wasmception/sysroot`.
 
 Next we will download and build a version of wrc20 which uses `malloc`. Make sure to edit the `Makefile` with the sysroot data above, and change the path of `clang` to our newly compiled version which may look something like `/home/user/repos/wasmception/dist/bin/clang`. Make sure that `main.syms` has a list of Ewasm helper functions you are using.
-
-Aside: If you are using C++, make sure to modify the Makefile to `clang++`, use `extern "C"` around the helper function declarations, and follow other tips from wasmception.
 
 ```sh
 git clone https://gist.github.com/poemm/91b64ecd2ca2f1cb4a88d31315313b9b.git cwrc20_with_malloc
