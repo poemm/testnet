@@ -5,9 +5,9 @@
 
 The goal of this document is to provide a guide to compile C/C++ to Ewasm. This document assumes knowledge of the [Ewasm design repo](https://github.com/ewasm/design). Especially relevant is that an Ewasm contract is a WebAssembly module with [restrictions](https://github.com/ewasm/design/blob/master/contract_interface.md), and that an Ewasm contract can call [Ewasm helper functions](https://github.com/ewasm/design/blob/master/eth_interface.md), which resemble EVM opcodes.
 
-## Caveats
+## Subtleties
 
-When writing Ewasm contracts in C/C++, one should bear in mind the following caveats.
+When writing Ewasm contracts in C/C++, one should bear in mind the following.
 
 1. WebAssembly is still primitive and [lacks features](https://github.com/WebAssembly/design/blob/master/FutureFeatures.md). For example, WebAssembly lacks support for exceptions. Also, compilers and standard libraries support is still primitive, often existing as experimental features or third party patches.
 
@@ -23,36 +23,28 @@ When writing Ewasm contracts in C/C++, one should bear in mind the following cav
 
 ## Basic Step-by-Step Guide
 
-First build the latest version of LLVM, clang, and lld. Below we deviate from the [official instructions](https://clang.llvm.org/get_started.html) by using git and adding some flags to `cmake`.
+LLVM will be used to compile `.c`/`.cpp` to `.wasm`. First install LLVM 7 or newer. (Older LLVM versions have only experimental WebAssembly support.)
 
-Aside: If you wish to use C/C++ standard libraries, then build the version of LLVM in the Advanced section below. That version can also be used here.
+Aside: If you wish to use C/C++ standard libraries, then you need the version of LLVM in the Advanced section below -- that version can also be used here.
 
-Aside: The following downloads hundreds of megabytes. The `make` step can take hours, require a lot of disk space and memory, and may even cause your computer to freeze. If there is an out-of-memory error, try again without the `-j 8` argument (which attempts to run eight parallel build processes).
+Aside: If you don't have access to a repository with LLVM 7, then follow the [official instructions](https://clang.llvm.org/get_started.html) to compile llvm, clang, and lld.
 
-```sh 
-# checkout LLVM, clang, and lld
-git clone http://llvm.org/git/llvm.git
-cd llvm/tools
-git clone http://llvm.org/git/clang.git
-git clone http://llvm.org/git/lld.git
-cd ../..
+```sh
+apt-get install clang-7 lld-7	# Available in Ubuntu 18.10 or later. LLVM 7 is also available in Fedora 29 and Debian Sid repositories.
+```
 
-# build LLVM, clang, and lld
-mkdir llvm-build
-cd llvm-build
-cmake -G "Unix Makefiles" -DLLVM_TARGETS_TO_BUILD= -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD=WebAssembly ../llvm                 
-make -j 8
-``` 
-
-
-Next download and compile an example ewasm contract written in C. Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. Before compiling, make sure that the `Makefile` has the correct path to `llvm-build` above, and that `main.syms` has a list of Ewasm helper functions you are using.
+Next download and compile the example ewasm contract written in C. Note that in `main.c`, there are many arrays in global scope: LLVM puts global arrays in WebAssembly memory, which allows them to be used as pointer arguments to Ethereum helper functions. `main.syms` has a list of Ewasm helper functions which you are using. The `Makefile` is optional, we copy/paste build commands below.
 
 Aside: A similar C++ example is found here https://gist.github.com/poemm/5dda50f354e06371fd0e7cef2271c6b0.git .
+
+Aside: There may be errors if you are not using LLVM 7 or greater. Check with `clang --version`, `llc --version`, and `wasm-ld --version`.
 
 ```sh
 git clone https://gist.github.com/poemm/68a7b70ec353abaeae64bf6fe95d2d52.git cwrc20
 cd cwrc20
-make
+clang -cc1 -Ofast -emit-llvm -triple=wasm32-unknown-unknown-wasm main.c
+llc -O3 -filetype=obj main.ll -o main.o
+wasm-ld --no-entry main.o -o main.wasm --strip-all -allow-undefined-file=main.syms -export=_main
 ```
 
 The output is `main.wasm` which needs a cleanup of imports and exports to meet [Ewasm requirements](https://github.com/ewasm/design/blob/master/contract_interface.md). For this, we can use [PyWebAssembly](https://github.com/poemm/pywebassembly), perform the cleanup manually, or use [wasm-chisel](https://github.com/wasmx/wasm-chisel), a program in Rust which can be installed with `cargo install chisel`. `wasm-chisel` is stricter and has more features, whereas `PyWebAssembly` is just enough for our use case, and Python is available on most machines. We therefore recommend using PyWebAssembly as follows.
@@ -85,7 +77,11 @@ cd ../../cwrc20
 
 ## Advanced
 
+#### Using C/C++ Standard Libraries
+
 The above guide is for compiling a C file with no libc. Next we use a package which provides a minimal toolchain which includes libc and libc++, as well as patches allowing things like `malloc`.
+
+Aside: To see how minimal it is, see the `Makefile` for wasmception. It just downloads LLVM, musl libc, and libc++, patches things, and builds with certain flags.
 
 ```
 git clone https://github.com/yurydelendik/wasmception.git
@@ -93,6 +89,7 @@ cd wasmception
 make	# Warning: this required lots of internet bandwidth, RAM, disk space, and one hour compiling on a mid-level laptop.
 cd ..
 ```
+
 Write down the end of the output of the above `make` command, it should include something like: `--sysroot=/home/user/repos/wasmception/sysroot`.
 
 Next we will download and build a version of wrc20 which uses `malloc`. Make sure to edit the `Makefile` with the sysroot data above, and change the path of `clang` to our newly compiled version which may look something like `/home/user/repos/wasmception/dist/bin/clang`. Make sure that `main.syms` has a list of Ewasm helper functions you are using.
@@ -106,4 +103,6 @@ make
 
 Now follow the same steps above to transform the output `main.wasm` into a valid Ewasm contract.
 
-Tutorials are needed for more advanced things. For example, to statically link against other C files, one can link the LLVM IR as described here https://aransentin.github.io/cwasm/.
+#### Compiling a Library and Statically Linking Against It
+
+Ways to statically link a `.wasm` file against another `.wasm` file is under development, see https://github.com/WebAssembly/tool-conventions/blob/master/Linking.md . Static linking can be done on LLVM IR as described here https://aransentin.github.io/cwasm/ . 
